@@ -13,6 +13,9 @@ import {
   LuPenLine,
   LuNotebookPen,
   LuBookOpen,
+  LuSpellCheck2,
+  LuLoaderCircle,
+  LuX,
 } from 'react-icons/lu'
 import Card from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
@@ -21,6 +24,7 @@ import { db } from '../db/db'
 import { useNotes } from '../hooks/useLiveData'
 import { todayKey, formatDisplayDate } from '../utils/dateUtils'
 import { renderMarkdown, markdownToPlainText } from '../utils/markdown'
+import { checkGrammar } from '../utils/grammar'
 
 function firstLine(content) {
   const plain = markdownToPlainText(content).trim()
@@ -46,6 +50,9 @@ export default function Notes() {
   const [preview, setPreview] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [saveError, setSaveError] = useState('')
+  const [grammarIssues, setGrammarIssues] = useState(null) // null = not checked yet, [] = checked, no issues
+  const [grammarChecking, setGrammarChecking] = useState(false)
+  const [grammarError, setGrammarError] = useState('')
   const textareaRef = useRef(null)
 
   // Saved notes use type: 'note' (singular) but the tab value is 'notes'
@@ -64,6 +71,8 @@ export default function Notes() {
     setForm({ title: '', content: '' })
     setPreview(false)
     setSaveError('')
+    setGrammarIssues(null)
+    setGrammarError('')
     setModalOpen(true)
   }
 
@@ -78,6 +87,8 @@ export default function Notes() {
     setForm({ title: '', content: '' })
     setPreview(false)
     setSaveError('')
+    setGrammarIssues(null)
+    setGrammarError('')
     setModalOpen(true)
   }
 
@@ -86,7 +97,50 @@ export default function Notes() {
     setForm({ title: note.title || '', content: note.content || '' })
     setPreview(false)
     setSaveError('')
+    setGrammarIssues(null)
+    setGrammarError('')
     setModalOpen(true)
+  }
+
+  // Content changes invalidate any grammar results already shown, since
+  // their character offsets would no longer line up with the new text.
+  function updateContent(value) {
+    setForm((f) => ({ ...f, content: value }))
+    if (grammarIssues !== null) setGrammarIssues(null)
+  }
+
+  async function runGrammarCheck() {
+    setGrammarChecking(true)
+    setGrammarError('')
+    try {
+      const issues = await checkGrammar(form.content)
+      setGrammarIssues(issues)
+    } catch (err) {
+      setGrammarError(err?.message || 'Could not check grammar right now.')
+      setGrammarIssues(null)
+    } finally {
+      setGrammarChecking(false)
+    }
+  }
+
+  // Applies one suggested replacement, then shifts the offsets of the
+  // remaining issues so they still point at the right spot in the text
+  // (since replacing text of a different length moves everything after it).
+  function applyGrammarFix(issue, replacement) {
+    const before = form.content.slice(0, issue.offset)
+    const after = form.content.slice(issue.offset + issue.length)
+    const updated = before + replacement + after
+    const shift = replacement.length - issue.length
+    setForm((f) => ({ ...f, content: updated }))
+    setGrammarIssues((prev) =>
+      prev
+        .filter((i) => i !== issue)
+        .map((i) => (i.offset > issue.offset ? { ...i, offset: i.offset + shift } : i))
+    )
+  }
+
+  function dismissGrammarIssue(issue) {
+    setGrammarIssues((prev) => prev.filter((i) => i !== issue))
   }
 
   async function saveNote(e) {
@@ -143,6 +197,7 @@ export default function Notes() {
       cursorPos = selectionStart + item.line.length
     }
     setForm((f) => ({ ...f, content: newValue }))
+    if (grammarIssues !== null) setGrammarIssues(null)
     requestAnimationFrame(() => {
       ta.focus()
       ta.setSelectionRange(cursorPos, cursorPos)
@@ -224,6 +279,16 @@ export default function Notes() {
               </button>
             ))}
             <div className="flex-1" />
+            <button
+              type="button"
+              className="btn-ghost p-2 flex items-center gap-1.5 text-xs"
+              title="Check grammar & spelling"
+              onClick={runGrammarCheck}
+              disabled={grammarChecking || !form.content.trim()}
+            >
+              {grammarChecking ? <LuLoaderCircle size={15} className="animate-spin" /> : <LuSpellCheck2 size={15} />}
+              <span className="hidden sm:inline">Check Grammar</span>
+            </button>
             {/* On desktop both write + preview show side by side, so this
                 toggle is only needed on smaller screens. */}
             <button type="button" className={`btn-ghost p-2 lg:hidden ${!preview ? 'text-violet dark:text-teal-soft' : ''}`} title="Write" onClick={() => setPreview(false)}>
@@ -234,13 +299,52 @@ export default function Notes() {
             </button>
           </div>
 
+          {grammarError && <p className="text-xs text-red-500">{grammarError}</p>}
+
+          {grammarIssues !== null && (
+            <div className="border border-border dark:border-border-dark rounded-lg p-2.5 max-h-40 overflow-y-auto">
+              {grammarIssues.length === 0 ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <LuSpellCheck2 size={14} /> No issues found — looks good!
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {grammarIssues.map((issue, i) => (
+                    <li key={i} className="text-xs border-b border-border dark:border-border-dark last:border-0 pb-2 last:pb-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-ink dark:text-ink-dark">{issue.message}</p>
+                        <button type="button" onClick={() => dismissGrammarIssue(issue)} className="btn-ghost p-0.5 shrink-0" aria-label="Dismiss">
+                          <LuX size={12} />
+                        </button>
+                      </div>
+                      {issue.replacements.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {issue.replacements.map((r, ri) => (
+                            <button
+                              key={ri}
+                              type="button"
+                              className="chip bg-violet/10 text-violet dark:bg-teal-soft/10 dark:text-teal-soft hover:opacity-80"
+                              onClick={() => applyGrammarFix(issue, r)}
+                            >
+                              {r || '(remove)'}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className={preview ? 'hidden lg:block' : 'block'}>
               <textarea
                 ref={textareaRef}
                 className="input min-h-[240px] lg:min-h-[320px] font-mono text-sm w-full"
                 value={form.content}
-                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                onChange={(e) => updateContent(e.target.value)}
                 placeholder={'Write in Markdown...\n\n# Heading\n**bold** and *italic*\n- bullet point\n- [ ] checkbox item'}
                 autoFocus={tab === 'journal'}
               />
