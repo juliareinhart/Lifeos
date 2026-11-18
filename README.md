@@ -48,11 +48,61 @@ npm run preview    # Preview the production build locally
 
 ---
 
+## 🧪 Automated Testing
+
+LifeOS uses **Vitest 3.2.7** for automated testing. Tests run in a Node.js environment using the configuration in `vitest.config.js`.
+
+### Prerequisites
+
+- Node.js 22
+- npm
+
+### Install Dependencies
+
+From the project root, run:
+
+```bash
+npm ci
+```
+
+This installs dependencies using the committed `package-lock.json`.
+
+### Run All Tests
+
+```bash
+npm test
+```
+
+The `test` script executes `vitest run`, which runs the test suite once and exits with a nonzero status if a test fails.
+
+### Run a Specific Test File
+
+```bash
+npx vitest run src/utils/score.test.js
+```
+
+### Verify the Production Build
+
+```bash
+npm run build
+```
+
+### Test Organization
+
+- `vitest.config.js` configures the Node.js test environment and discovers `src/**/*.test.{js,jsx}`.
+- Test files are colocated with the source modules they verify.
+- `src/utils/score.test.js` initially verifies that a daily productivity score with all zero inputs returns zero.
+
+Additional regression tests will be added for productivity calculations, routine streaks, backup/restore behavior, and habit periods.
+
+---
+
 ## 🌐 Deploying to GitHub Pages (Free)
 
 1. **Create a GitHub repository** (e.g. `lifeos`)
 
 2. **Push your code:**
+
    ```bash
    git init
    git add .
@@ -63,15 +113,18 @@ npm run preview    # Preview the production build locally
    ```
 
 3. **Deploy:**
+
    ```bash
    npm run deploy
    ```
+
    This builds the app and pushes it to a `gh-pages` branch.
 
 4. **Enable GitHub Pages:**
    Go to your repo → **Settings → Pages** → set Branch to `gh-pages`, folder to `/ (root)` → Save
 
 5. Your app will be live at:
+
    ```
    https://YOUR_USERNAME.github.io/lifeos/
    ```
@@ -82,16 +135,16 @@ npm run preview    # Preview the production build locally
 
 ## 🛠️ Tech Stack
 
-| Purpose | Library |
-|---|---|
-| UI Framework | React 18 + Vite |
-| Styling | Tailwind CSS |
-| Local Database | Dexie.js (IndexedDB) |
-| Charts | Recharts |
-| Icons | react-icons (Lucide set) |
-| State | Zustand |
-| Routing | React Router (HashRouter, for GitHub Pages compatibility) |
-| Offline Support | vite-plugin-pwa |
+| Purpose         | Library                                                   |
+| --------------- | --------------------------------------------------------- |
+| UI Framework    | React 18 + Vite                                           |
+| Styling         | Tailwind CSS                                              |
+| Local Database  | Dexie.js (IndexedDB)                                      |
+| Charts          | Recharts                                                  |
+| Icons           | react-icons (Lucide set)                                  |
+| State           | Zustand                                                   |
+| Routing         | React Router (HashRouter, for GitHub Pages compatibility) |
+| Offline Support | vite-plugin-pwa                                           |
 
 ---
 
