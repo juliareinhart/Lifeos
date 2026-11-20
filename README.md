@@ -91,9 +91,86 @@ npm run build
 
 - `vitest.config.js` configures the Node.js test environment and discovers `src/**/*.test.{js,jsx}`.
 - Test files are colocated with the source modules they verify.
-- `src/utils/score.test.js` initially verifies that a daily productivity score with all zero inputs returns zero.
+- `src/utils/score.test.js` contains 32 productivity score and level regression tests.
+- `src/utils/streaks.test.js` contains 15 routine streak, completion percentage, and heatmap regression tests.
+- `src/utils/dateUtils.test.js` contains 13 calendar date calculation regression tests.
 
-Additional regression tests will be added for productivity calculations, routine streaks, backup/restore behavior, and habit periods.
+The automated regression suite currently contains 60 tests covering
+productivity scoring, routine streaks, completion percentages,
+heatmap generation, and date calculations.
+
+Additional regression coverage for backup/restore behavior and habit
+periods remains future work.
+
+### Continuous Integration (GitHub Actions)
+
+LifeOS uses GitHub Actions to automatically verify application builds
+and regression tests.
+
+The workflow is defined in `.github/workflows/ci.yml`.
+
+#### Workflow Triggers
+
+The CI workflow runs automatically when:
+
+- A pull request is opened or updated against `main`.
+- A commit is pushed to the `main` branch.
+
+#### CI Environment
+
+- Operating system: Ubuntu (`ubuntu-latest`)
+- Node.js: Version 22
+- Timezone: UTC
+- Dependencies: Installed using `npm ci` and the committed `package-lock.json`
+
+UTC is configured to provide a consistent environment for
+date-sensitive regression tests.
+
+#### Automated Verification
+
+The workflow executes these commands:
+
+```bash
+npm ci
+npm run build
+npm test
+```
+
+The build step verifies that the application compiles successfully
+for production. The test step executes the complete Vitest
+regression suite.
+
+If installation, compilation, or any test fails, the workflow
+reports a failed check.
+
+#### Viewing CI Results
+
+1. Open the LifeOS repository on GitHub.
+2. Select the **Actions** tab.
+3. Select the **CI** workflow.
+4. Open a workflow run to inspect the `build-and-test` job.
+5. Expand individual steps to view installation, build, and test logs.
+
+For pull requests targeting `main`, CI results also appear in
+the pull request's **Checks** section.
+
+A green check indicates that the workflow succeeded.
+A red failure indicator means that one or more steps failed.
+
+#### Local Verification
+
+Developers can reproduce the CI verification commands locally:
+
+```bash
+npm ci
+TZ=UTC npm run build
+TZ=UTC npm test
+```
+
+These commands should succeed before submitting a pull request.
+
+The CI workflow performs verification only. It does not deploy
+the application or modify production data.
 
 ---
 
